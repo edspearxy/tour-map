@@ -8,8 +8,8 @@ you, or near someone you're buying tickets for.
 
 | Gate | State |
 |---|---|
-| Ideation | **Parked** 2026-11-16 — Bandsintown already solves it (see `ideation/decision.md`) |
-| Discovery | Not started |
+| Ideation | **Pursue** 2026-11-16 (v2: map-first tour view, Ticketmaster API) — see `ideation/decision.md` |
+| Discovery | In progress |
 | Design | Not started |
 | Build | Not started |
 | Test | Not started |
