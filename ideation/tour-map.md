@@ -3,8 +3,8 @@
 > **v2, 2026-11-16.** Supersedes v1 (parked — see `decision.md`). v1 proposed scraping tour
 > pages and positioned against location-first discovery; the council found the scraping claim
 > unsupported, and the product owner confirmed Bandsintown already offers an artist tour map.
-> v2 narrows the idea to a map-first view of a single artist's tour, fed by manually uploaded
-> data. Previous version is in git history.
+> v2 narrows the idea to a map-first view of a single artist's tour, fed by the Ticketmaster
+> Discovery API. Previous version is in git history.
 
 ## The problem
 
@@ -45,12 +45,14 @@ Halifax Piece Hall — rather than a list with a map tucked behind it.
 2. See the whole UK tour as pins on a full-screen map.
 3. Tap a pin for date, venue and a link to buy tickets.
 
-**Data for the MVP: manual upload.** Tour dates are uploaded by hand (e.g. a spreadsheet/CSV of
-artist, date, venue, town, ticket link) for a small set of artists. No scraping and no
-third-party events API, so no licence or terms-of-use dependency. Automated sources (e.g.
-Ticketmaster's Discovery API) are a later step once the map experience is proven.
+**Data for the MVP: the Ticketmaster Discovery API.** Search for an artist by name and pull their
+upcoming UK events (date, venue, venue coordinates, ticket link) from Ticketmaster's public,
+free-tier API, used within its published terms. No scraping. Choosing a real third-party API is
+deliberate: integrating one is itself part of the learning. Known limit: only dates Ticketmaster
+sells or lists appear, so tours sold mainly through other ticket agents (See Tickets, Dice, AXS)
+will show gaps — acceptable for an experiment, and visible to the user.
 
-**Scope:** music, UK only, a handful of hand-curated artists.
+**Scope:** music, UK only, any artist Ticketmaster lists.
 
 **Commercial intent:** side project; affiliate ticket links possibly later. No revenue target.
 
@@ -65,22 +67,26 @@ people find this one quicker and easier to navigate.
 
 ## Validation path
 
-Upload 3–5 real UK tours by hand, use the map for real ticket decisions (my own and gifts), and
+Pick 3–5 real UK tours, use the map for real ticket decisions (my own and gifts), and
 show it to a few friends who go to gigs, asking them to find a given date on this map and on
 Bandsintown's. If the map-first view isn't clearly quicker than both the list and Bandsintown's
-map, stop before investing in automated data. Map UX variants can be tried cheaply because the
-data is fixed and hand-curated.
+map, stop before investing further. Check early how many of those tours Ticketmaster covers in
+full — if most have large gaps, the data source, not the map, is the constraint.
 
 ## Risks
 
 - **Market:** Bandsintown covers most of the job; this is unlikely to win users from it, which
   is acceptable for a personal/learning project.
-- **Data freshness:** manually uploaded dates go stale when tours add, move or cancel dates.
-  Acceptable for a handful of artists; the trigger to automate.
-- **Venue location accuracy:** each venue needs a correct map position; with manual upload this
-  can be captured (or checked) at upload time.
+- **Data coverage:** Ticketmaster only shows its own and partner listings; some tours will be
+  incomplete, which could make the map look wrong rather than just sparse.
+- **API dependency and terms:** free tier is rate-limited (5,000 calls/day, 5/second) and
+  governed by Ticketmaster's terms (attribution, caching, display rules) — these must be read
+  before build; the key can be revoked.
+- **Artist matching:** a name search can return the wrong act or tribute bands.
+- **Venue location accuracy:** relies on Ticketmaster's venue coordinates being present and
+  correct.
 
 ## Decided for the MVP
 
-- **Uploads:** only the site owner uploads tour data; no visitor uploads.
+- **No user accounts or uploads:** visitors only search and view.
 - **"Distance from a location"** (enter a postcode, see distances): after the MVP, not in it.
