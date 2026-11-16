@@ -15,7 +15,9 @@ buying tickets for. Answering that from a list means reading every entry and pla
 on a mental map.
 
 Bandsintown already offers an event map on its artist pages, but the map is secondary to the
-list, sits inside a wider discovery product, and is not the thing you land on.
+list, sits inside a wider discovery product, and is not the thing you land on. From first-hand
+use, its map is **hard to navigate**: getting from "this artist" to "the whole tour at a glance"
+takes too much effort for what should be an instant overview.
 
 ## Who has it
 
@@ -25,7 +27,13 @@ list, sits inside a wider discovery product, and is not the thing you land on.
 ## Why now
 
 Personal frustration: I've repeatedly read down long tour lists trying to work out which dates
-are reachable. This is a side project and a learning build, not a market-timing bet.
+are reachable, and the existing map option is awkward to use. This is a side project, not a
+market-timing bet.
+
+**Purpose: a map-UX experiment.** The point is to explore what a genuinely easy tour map feels
+like — default zoom and framing, pin density and clustering where dates bunch up (e.g. London),
+how date/venue details appear, how the map reads on a phone — and learn from it. The product
+exists to test those interaction ideas, not to compete with Bandsintown for users.
 
 ## Rough shape of the idea
 
@@ -52,13 +60,16 @@ branding, design or data.
 ## What success looks like
 
 Landing on an artist's page, a fan can identify the nearest or most convenient date within
-seconds, without reading a list.
+seconds, without reading a list — and, side by side with Bandsintown's map for the same tour,
+people find this one quicker and easier to navigate.
 
 ## Validation path
 
 Upload 3–5 real UK tours by hand, use the map for real ticket decisions (my own and gifts), and
-show it to a few friends who go to gigs. If the map-first view isn't clearly quicker than the
-list, stop before investing in automated data.
+show it to a few friends who go to gigs, asking them to find a given date on this map and on
+Bandsintown's. If the map-first view isn't clearly quicker than both the list and Bandsintown's
+map, stop before investing in automated data. Map UX variants can be tried cheaply because the
+data is fixed and hand-curated.
 
 ## Risks
 
@@ -69,7 +80,7 @@ list, stop before investing in automated data.
 - **Venue location accuracy:** each venue needs a correct map position; with manual upload this
   can be captured (or checked) at upload time.
 
-## Open questions
+## Decided for the MVP
 
-- Who uploads — only me as site owner, or any visitor (e.g. paste a CSV to see their own map)?
-- Does "near a location" (enter a postcode, see distances) belong in the MVP or after it?
+- **Uploads:** only the site owner uploads tour data; no visitor uploads.
+- **"Distance from a location"** (enter a postcode, see distances): after the MVP, not in it.
