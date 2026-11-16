@@ -8,7 +8,7 @@ you, or near someone you're buying tickets for.
 
 | Gate | State |
 |---|---|
-| Ideation | Idea brief drafted — awaiting review, then `/ideation` |
+| Ideation | **Parked** 2026-11-16 — Bandsintown already solves it (see `ideation/decision.md`) |
 | Discovery | Not started |
 | Design | Not started |
 | Build | Not started |
