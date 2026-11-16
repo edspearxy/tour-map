@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "agentic-sdlc-toolkit": {
+      "source": {
+        "source": "github",
+        "repo": "edspearxy/agentic-sdlc-toolkit"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "agentic-sdlc@agentic-sdlc-toolkit": true
+  }
+}
