@@ -1,6 +1,6 @@
 # PRD: Tour Map
 
-- **Status:** Draft for Discovery review (revision 1)
+- **Status:** Draft for Discovery review (revision 2)
 - **Date:** 2026-11-16
 - **Upstream inputs:** `ideation/tour-map.md` (v2 brief, approved), `ideation/market-research.md`
   (2026-11-16 snapshot), `ideation/decision.md` (Pursue, 2026-11-16)
@@ -158,6 +158,9 @@ convenient date within seconds … people find this one quicker and easier to na
   - **If G1 is met but G6 or G7 is not:** the shortfall is recorded in the R25 write-up. No
     post-MVP work starts until the owner records a decision either to accept the result or to try
     one documented UX variation aimed at the missed measure and re-run R25.
+  - **If R25 can't run in full within the G1 timeframe:** R25 AC3 applies. A reduced run is judged
+    as above and reported as indicative. An inconclusive close counts as G1 not met, so no
+    post-MVP work starts.
 - **G2:** a manual comparison recorded in the R2 ticket. For each tour, list the dates on the
   artist's own official tour page and the events the Discovery API returns, then mark the tour
   "fully covered" or "partial" with the missing dates named.
@@ -201,8 +204,10 @@ delivered and verified as **one tracker issue**. Validation work (R1–R4, R25) 
 way as code, because its outcomes gate the build. The group headings below are scope areas, not
 tickets. Requirement IDs are stable across revisions so issue links don't break.
 
-**Sequencing constraint** `[Decision]`: R1–R4 complete before any ticket in groups C–E starts.
-R1 and R2 have stop conditions that can end or change the build.
+**Sequencing constraint** `[Decision]`: R3 completes before any ticket in group B starts, because
+group B holds the requirements that depend most on the terms (R8 caching, R10 tile provider and
+attribution). R1–R4 complete before any ticket in groups C–E starts. R1 and R2 have stop
+conditions that can end or change the build.
 
 **UK bounding box** `[Decision]`, used by R11 (landing framing) and R18 (placeability filter):
 latitude **49.80 to 60.90** (°N) and longitude **−8.70 to 1.80** (8.70°W to 1.80°E), both
@@ -218,15 +223,23 @@ Register a standard Ticketmaster Discovery API v2 key. Using it, request events 
 `countryCode=GB` and `classificationName=music` for 3 artists known to have upcoming UK
 Ticketmaster dates. Record the request URLs, event counts, whether venue `location.latitude`
 and `location.longitude` are present, the maximum accepted page size, and whether and how
-event status (cancelled, postponed) is reported.
+event status (cancelled, postponed) is reported. For the same 3 artists, also make the R6
+attractions search (`keyword` + `classificationName=music`) once with the full name and once
+with a partial name (first word only), and the R7 attraction lookup for one known and one
+made-up ID. Record which searches return the artist and what the made-up ID returns.
 - *Why:* research could not confirm GB results on a standard key, and the separate International
   Discovery API reportedly no longer takes new key requests `[Evidence: market-research.md,
-  unverified]`.
-- **AC1:** Given a standard key, when the 3 requests are made, then each returns ≥1 GB event and
-  the results are recorded in the R1 ticket. → Pass: the build proceeds.
-- **AC2:** Given a standard key, when any request returns no GB events for an artist known to
-  have them, or returns an access error, then the result is recorded and no group C–E ticket
-  starts until the product owner has decided what to do (the default is to stop).
+  unverified]`. Research also found no source confirming how `classificationName=music` combines
+  with `keyword` on attractions, and partial words don't match on events `[Evidence:
+  market-research.md, "How artists are searched", unverified]`.
+- **AC1:** Given a standard key, when the requests are made, then each events request returns ≥1
+  GB event, each full-name attractions search returns that artist in its first 10 results, and
+  the results (including the partial-name outcomes) are recorded in the R1 ticket. → Pass: the
+  build proceeds.
+- **AC2:** Given a standard key, when any events request returns no GB events for an artist known
+  to have them, any full-name attractions search does not return the artist, or any request
+  returns an access error, then the result is recorded and no group C–E ticket starts until the
+  product owner has decided what to do (the default is to stop).
 - **AC3:** Given R1 is complete, then the ticket records the maximum page size accepted and the
   event status field (or its absence), answering A3 and Q3.
 
@@ -298,22 +311,30 @@ The browser calls only the project's own endpoints (R6, R7).
 
 **R6. Artist search endpoint.**
 `GET /api/artists?q={name}` calls the Discovery attractions endpoint with `keyword={name}` and
-`classificationName=music`. It returns at most 10 candidates, each with `attractionId`, `name`
-and, if present, genre. The query must be 2–100 characters after trimming.
-- **AC1:** Given q="Coldplay", when called, then the response is a JSON array of ≤10 objects,
-  each with non-empty `attractionId` and `name`.
+`classificationName=music`. It returns a JSON object `{"results": [...], "truncated": bool}`:
+`results` holds at most 10 candidates, each with `attractionId`, `name` and, if present, genre;
+`truncated` is true if the upstream reports more than 10 attractions (E-R6a). The query must be
+2–100 characters after trimming.
+- **AC1:** Given q="Coldplay", when called, then `results` holds ≤10 objects, each with non-empty
+  `attractionId` and `name`, and `truncated` is a boolean.
 - **AC2:** Given q is shorter than 2 or longer than 100 characters after trimming, then the
   endpoint returns HTTP 400 and makes no upstream call.
 - **AC3:** Given the upstream returns no attractions, then the endpoint returns HTTP 200 with an
-  empty array.
+  empty `results` array and `truncated: false`.
 
 **R7. Artist events endpoint.**
-`GET /api/artists/{attractionId}/events` calls the Discovery events endpoint with that
-`attractionId`, `countryCode=GB`, `classificationName=music`, upcoming events only, sorted by date
-ascending, page size 200, first page only. For each event it returns: `eventId`, `localDate`,
-`localTime` (nullable), `venueName`, `city`, `latitude` and `longitude` (parsed to numbers,
-nullable), `ticketUrl`, and a `placeable` flag (see R18). It also returns `attractionName` and
-`truncated: true` if the upstream reports more than 200 events.
+`GET /api/artists/{attractionId}/events` makes two upstream calls. First, the Discovery
+attraction lookup (`/discovery/v2/attractions/{attractionId}`) supplies `attractionName`; if it
+reports the ID as not found, the endpoint returns HTTP 404 and makes no second call. Second, the
+events endpoint with that `attractionId`, `countryCode=GB`, `classificationName=music`, upcoming
+events only, sorted by date ascending, page size 200, first page only. For each event it returns:
+`eventId`, `localDate`, `localTime` (nullable), `venueName`, `city`, `latitude` and `longitude`
+(parsed to numbers, nullable), `ticketUrl`, and a `placeable` flag (see R18). It also returns
+`attractionName` and `truncated: true` if the upstream reports more than 200 events. An
+uncached request therefore costs 2 upstream calls against R9.
+- *Why the lookup:* an events query alone can't name an artist with 0 UK dates (E-R7a) or tell
+  an unknown ID from a known artist with no UK dates. `[Assumption]` the lookup reports an unknown
+  ID as not found; R1 checks this.
 - *Why the page cap:* the API caps size × page below 1,000 `[Evidence: market-research.md,
   unverified]`. `[Assumption: A3]` 200 is the maximum page size and no UK tour exceeds it. R1
   confirms the maximum.
@@ -343,6 +364,8 @@ default, set by configuration. A value of 0 turns caching off.
   From 4,500 calls in a day it stops making new upstream calls: cached responses are still
   served, and uncached requests get HTTP 503 with the JSON body `{"reason": "daily-limit"}` (no
   `Retry-After` header). The browser then shows the E-R9a state.
+- **What counts:** every upstream call counts towards both limits, including both R7 calls and
+  E-R10 retries.
 - **Logging:** it logs the daily count and the number of upstream 429 responses (G5).
 - *Why:* free-tier limits of 5,000 calls/day and 5/second `[Evidence: market-research.md,
   unverified]`; the terms allow throttling of heavy non-user-driven use `[Evidence: same, secondary,
@@ -372,8 +395,9 @@ with MapTiler and OpenStreetMap attribution shown on the map at all times.
   so a side project carries no surprise bill. It is limited to non-commercial use, which fits an
   MVP with no revenue or affiliate links `[Evidence: market-research.md, MapTiler terms via
   search summary, official numbers not read]`. Alternatives rejected: the OSM standard tile
-  server, because its policy discourages application use, needs permission for heavy use and can
-  block without notice `[Evidence: market-research.md, Map provider costs and terms]`; Mapbox,
+  server, because its policy requires an identifying User-Agent and Referer, needs permission for
+  heavy use, can block without notice and recommends running your own tile server
+  `[Evidence: market-research.md, Map provider costs and terms, search summary]`; Mapbox,
   because GL JS is no longer open source and sources disagree on whether a card is needed
   `[Evidence: same]`; Google Maps Platform, because it reportedly needs a billing account
   `[Evidence: same section; the billing account is not stated in the source summary, unverified]`.
@@ -474,7 +498,8 @@ wider viewports it is a side panel.
 
 **R16. Artist header.**
 A header shows the artist name (`attractionName`), "N UK dates on Ticketmaster" (N = all returned
-events, placeable or not), and a "Search again" control that returns to the landing page.
+events, placeable or not, excluding any marked cancelled under E-R7e; postponed events are
+counted), and a "Search again" control that returns to the landing page.
 - **AC1:** Given 12 returned events, 11 placeable, then the header reads "12 UK dates on
   Ticketmaster".
 
@@ -644,8 +669,12 @@ Protocol:
   sets for each tour used, made before the first trial. Any trial on a tour without a matching
   record for that day is excluded from analysis, and the exclusion is noted.
 - **AC3:** Given that fewer than 3 tours are eligible after step 2, or fewer than 5 testers are
-  available, then the test is postponed rather than run with a smaller set, and the reason is
-  recorded.
+  available, then the test is postponed, and the reason is recorded. Postponement ends at the G1
+  timeframe (4 weeks after going live). If the full test has not run by then, the owner records
+  one of two outcomes in the R25 ticket within a week: (i) run with what is available (at least
+  1 eligible tour and 3 testers), with the shortfall recorded as a limitation and G1(b) and the
+  G6 ranking condition requiring all but one tester; or (ii) close the experiment as
+  inconclusive. §4 treats both as defined outcomes.
 - **AC4:** Given the sessions are complete, then the results sheet holds the step 8 overlap count
   per tour. For every Tour Map trial whose correct answer is an overlapping pin, it holds the
   time, the correctness, the pin-tap count and the zoom-before-answer flag. The write-up states a
@@ -667,8 +696,8 @@ for a tour of ≤50 events.
 | ID | Situation | Behaviour |
 |---|---|---|
 | E-R1/R2 | Pre-build stop conditions met | No group C–E ticket starts; the product owner decision is recorded in the R1/R2 ticket (R1 AC2, R2 AC2). |
-| E-R6a | Upstream returns more than 10 attractions | The first 10 in upstream relevance order are shown with the hint "Showing the top 10 matches. Add more of the name to narrow it down." |
-| E-R6b | Name matches a tribute act or a same-named act | Shown in the R11 picker list with genre where available. `[Assumption: A7]` the visitor can tell which act is which by name and genre. No automatic filtering of tributes, because the API offers no reliable flag `[Evidence: market-research.md, artist matching risk]`. |
+| E-R6a | Upstream reports more than 10 attractions (R6 `truncated: true`) | The first 10 in upstream relevance order are shown with the hint "Showing the top 10 matches. Add more of the name to narrow it down." |
+| E-R6b | Name matches a tribute act or a same-named act | Shown in the R11 picker list with genre where available. `[Assumption: A7]` the visitor can tell which act is which by name and genre. No automatic filtering of tributes. `[Assumption]` the API has no reliable tribute flag; the research did not cover this. |
 | E-R6c | Exactly 1 match that turns out to be the wrong act | The visitor uses "Search again" (R16). The R11 auto-jump is accepted at this cost. |
 | E-R7a | Artist has 0 upcoming GB events on Ticketmaster | Map shows the UK framing (R14) with header "0 UK dates on Ticketmaster" and the message "Ticketmaster doesn't list any upcoming UK dates for {artist}. Dates sold elsewhere won't appear here. Check the artist's official site." The R17 notice stays. Never "not touring". |
 | E-R7b | Upstream reports more than 200 events | The first 200 by date are shown, with a line under the header: "Showing the first 200 dates." |
@@ -677,7 +706,7 @@ for a tour of ≤50 events.
 | E-R7e | Cancelled or postponed event status present in the data | `[Assumption]` the API marks status. Such events are shown with "Cancelled" or "Postponed" next to the date and no ticket link. To be confirmed in R1 (AC3). |
 | E-R9a | Daily limit reached (R9) | Uncached requests get 503 `daily-limit`, and the browser shows "Tour Map has reached its daily data limit. Try again tomorrow." No retry button and no automatic retry. |
 | E-R9b | Request refused by the per-second queue (R9) | 503 `busy` with `Retry-After: 5`. The browser shows "Tour Map is busy right now. Try again in a few seconds." with a "Try again" button that re-requests once per tap. No automatic retry. |
-| E-R10 | Upstream timeout (8s), 5xx or 429 | One retry after 1 second. If that fails, the endpoint returns 502. During artist search (R6) the browser shows "Couldn't search Ticketmaster just now."; on an artist map (R7) it shows "Couldn't load tour dates from Ticketmaster just now." Both have a "Try again" button that re-requests once per tap. No automatic retry loops. |
+| E-R10 | Upstream timeout (8s), 5xx or 429 | One retry after 1 second, counted by R9 like any other call. If that fails, the endpoint returns 502. During artist search (R6) the browser shows "Couldn't search Ticketmaster just now."; on an artist map (R7) it shows "Couldn't load tour dates from Ticketmaster just now." Both have a "Try again" button that re-requests once per tap. No automatic retry loops. |
 | E-R10b | API key revoked or invalid (upstream 401/403) | No retry. The browser shows the E-R10 message for the request type. The server logs "auth-failure" at error level so the owner can see it. Recovery is a manual key change. |
 | E-R10c | Map tiles fail to load or the MapTiler free plan is suspended for the month | Pins and panels still render on a plain background. A banner reads "Map background unavailable. Dates are still shown." `[Assumption]` MapLibre can render markers without tiles; confirmed at Design. |
 | E-R12 | Unknown or denylisted attractionId in the URL | Landing page with the message "We couldn't find that artist. Try searching by name." |
@@ -755,7 +784,7 @@ the owner's recorded decision under §4 must exist first.
 
 | # | Risk | Type | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|---|
-| K1 | Ticketmaster covers too few tours fully to run a fair test | Data | Medium (5 of 12 major arenas `[Evidence]`) | Experiment can't answer G1 | R2 runs before any UI work, with a stop default decided in advance and no partial-coverage override |
+| K1 | Ticketmaster covers too few tours fully to run a fair test | Data | Medium (5 of 12 major arenas `[Evidence: market-research.md, unverified]`) | Experiment can't answer G1 | R2 runs before any UI work, with a stop default decided in advance and no partial-coverage override |
 | K2 | **Strongest case against this plan:** the G1 test measures data completeness or clutter, not map UX, because a tester finds the date faster in whichever condition shows fewer or different dates | Validity | High without controls | G1 result is meaningless | Partial-coverage tours are never tested (R2 AC2). On each session day all three conditions' date sets must be identical (R25 step 1). Towns are chosen so no past date on the list is nearer than the answer (R25 step 4). Correct answers are fixed against the verified set. Condition order and town assignment rotate (R25 step 5) |
 | K3 | Fans read missing dates as "no show near me" and draw the wrong conclusion | User harm / trust | Medium | Wrong decision by a fan | R17 permanent notice and wording bans; E-R7a empty-state wording |
 | K4 | Terms conflict, for example caching banned, a required attribution form, or the replication clause read as covering this site | Legal | Unknown until R3 | Rework, or the experiment stops | R3 before build; R8 TTL configurable to 0; no purchase or price features (§9) |
@@ -767,7 +796,7 @@ the owner's recorded decision under §4 must exist first.
 | K10 | Bandsintown map changed or removed, so there's no comparator | Validity | Unknown | G1 and G6 lose one comparison | R4 records it; R25 step 1 re-checks it on each session day; R25 falls back to list-only (R4 AC2) |
 | K11 | Friendly testers are biased | Validity | Medium | G1 and G6 results overstate the benefit | Per-tester results recorded; ≥4 of 5 conditions; finding reported as indicative, not conclusive |
 | K12 | The idea isn't new (Tour Radius, MusicMap and others) | Market | Known | None on a learning project | No novelty claim; R4 records any live tools as reference |
-| K13 | **Test tours expire or drift between R2 and R25.** The build is unscheduled side-project time, so R2's tours may have finished, lost dates to upcoming-only filtering, or gained dates on the official list or Bandsintown that Ticketmaster doesn't have | Validity / schedule | High over a multi-month build `[Assumption]` | Too few eligible tours, or a G1 that silently measures completeness | R2 prefers tours running ≥3 months past the check and keeps every fully covered tour as a candidate (R2 AC1); R25 step 1 re-verifies all three date sets on each session day; R25 step 2 tops up with newly checked tours; R25 AC2 excludes unverified trials; R25 AC3 postpones rather than shrinks the test |
+| K13 | **Test tours expire or drift between R2 and R25.** The build is unscheduled side-project time, so R2's tours may have finished, lost dates to upcoming-only filtering, or gained dates on the official list or Bandsintown that Ticketmaster doesn't have | Validity / schedule | High over a multi-month build `[Assumption]` | Too few eligible tours, or a G1 that silently measures completeness | R2 prefers tours running ≥3 months past the check and keeps every fully covered tour as a candidate (R2 AC1); R25 step 1 re-verifies all three date sets on each session day; R25 step 2 tops up with newly checked tours; R25 AC2 excludes unverified trials; R25 AC3 postpones up to the G1 timeframe, then forces a recorded outcome |
 | K14 | Close-together venues (for example, London) overlap at default framing, so Tour Map's no-clustering choice slows the core job | Product / validity | Unknown | Tour Map slower on bunched tours | Measured, not assumed: R25 density task and density record (AC4) feed the post-MVP clustering decision |
 
 ### Assumptions (if wrong, the plan changes)
